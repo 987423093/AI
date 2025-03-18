@@ -9,6 +9,7 @@ from openai import OpenAI
 import time
 import datetime
 import uuid
+import re
 
 # 阿里云百炼API配置
 DASHSCOPE_API_KEY = "sk-b8190cc0897b49b494c4dc8d6228c3bf"  # 请替换为您的阿里云DashScope API Key
@@ -104,30 +105,43 @@ def generate_anime_pet(description):
         pet_features = description.split("。")[0:3]  # 取描述的前几句话作为关键特征
         pet_features_text = "。".join(pet_features)
         
-        # 构建更详细的提示词，强调保持原图特征
-        prompt = f"""生成一张可爱的动漫风格宠物图片，基于以下描述：{pet_features_text}
-        要求：
-        1. 必须完全保持与原图宠物相同的姿势、姿态和动作，包括身体朝向、头部角度和四肢位置
-        2. 必须精确匹配原图宠物的确切品种和种类
-        3. 必须精确匹配原图宠物的毛色、花纹和颜色分布
-        4. 必须保持与原图宠物相同的体型比例和特征
-        5. 画风可爱、精致，像宫崎骏或迪士尼动画风格
-        6. 明亮温暖的色调，细腻的毛发纹理
-        7. 大眼睛，表情生动可爱，但表情应与原图相符
-        8. 简洁干净的背景，突出宠物形象
-        9. 如果原图中有多个宠物，请保持它们之间的相对位置和互动关系
+        # 尝试从描述中提取品种和颜色信息
+        
+        # 提取品种信息
+        breed_match = re.search(r'这是一只(.*?)(?:犬|猫|兔|鸟|鹦鹉|仓鼠|豚鼠|蜥蜴|龟|鱼)', description)
+        breed = breed_match.group(1) + breed_match.group(2) if breed_match else ""
+        
+        # 提取颜色信息
+        color_match = re.search(r'(黑|白|灰|棕|黄|橙|红|蓝|绿|米|奶油|金|银|褐|咖啡|巧克力|双色|三色|多色)(色|毛)', description)
+        color = color_match.group(1) if color_match else ""
+        
+        # 构建宫崎骏风格的提示词
+        prompt = f"""生成一张高质量的宫崎骏风格宠物图片，必须严格遵循以下要求：
+        
+        1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
+        2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
+        3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
+        4. 宫崎骏风格：温暖柔和的色调，圆润的线条，富有表现力的大眼睛，细腻的毛发纹理
+        5. 艺术特点：类似《龙猫》《千与千寻》《哈尔的移动城堡》的温馨画风，手绘质感
+        6. 光影效果：柔和的自然光线，温暖的色彩过渡，轻微的水彩晕染效果
+        7. 背景：简洁温馨的自然环境，如草地、森林或温暖的室内场景，带有宫崎骏电影中常见的自然元素
+        8. 表情：保持宠物原有表情的同时，增添一丝灵动和温暖感
+        
+        原图宠物描述：{pet_features_text}
+        
+        重要提示：这是一个宫崎骏风格改造任务，但必须保持宠物的品种、颜色和关键特征完全一致，让原宠物主人能一眼认出自己的宠物。
         """
         
         # 构建请求体
         payload = {
-            "model": "wanx2.1-t2i-plus",
+            "model": "wanx2.1-t2i-turbo",
             "input": {
                 "prompt": prompt
             },
             "parameters": {
                 "size": "1024*1024",  # 图片尺寸
                 "n": 1,  # 生成图片数量
-                "negative_prompt": "变形, 错误姿势, 不同姿势, 不同角度, 不同朝向, 错误品种, 错误颜色, 错误花纹, 错误体型, 多余的宠物, 缺少的宠物"  # 负面提示词，避免特征变化
+                "negative_prompt": "变形, 错误姿势, 不同姿势, 不同角度, 不同朝向, 错误品种, 错误颜色, 错误花纹, 错误体型, 多余的宠物, 缺少的宠物, 品种混合, 品种变化, 颜色变化, 不同品种, 过度卡通化, 过度简化, 科幻元素, 机械部件, 不自然的颜色"  # 负面提示词
             }
         }
         
@@ -234,7 +248,7 @@ def generate_anime_pet(description):
 def main():
     # 设置页面配置
     st.set_page_config(
-        page_title="AI宠物描述生成器",
+        page_title="宠物动漫形象生成器",
         page_icon="🐾",
         layout="centered",
         initial_sidebar_state="collapsed"
@@ -297,6 +311,14 @@ def main():
         font-size: 0.8rem;
         margin-top: 2rem;
     }
+    .quota-info {
+        text-align: center;
+        background-color: #F0F8FF;
+        padding: 0.5rem;
+        border-radius: 5px;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
     /* 移动端优化 */
     @media (max-width: 768px) {
         .main-header {
@@ -329,28 +351,131 @@ def main():
     div.block-container {
         padding-top: 2rem;
     }
+    
+    /* 修改文件上传器样式 */
+    .stFileUploader > div > div {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .stFileUploader > div > div > span {
+        display: none !important;
+    }
+    
+    .stFileUploader > div {
+        padding: 0 !important;
+        background-color: transparent !important;
+    }
+    
+    /* 隐藏左侧括号 */
+    .stFileUploader > div > div::before {
+        content: none !important;
+    }
+    
+    /* 上传按钮样式 */
+    .stFileUploader label[data-testid="stFileUploadDropzone"] {
+        background-color: #f8f9fa;
+        border: 2px dashed #4ECDC4 !important;
+        border-radius: 10px;
+        padding: 20px !important;
+    }
+    
+    .stFileUploader label[data-testid="stFileUploadDropzone"]:hover {
+        background-color: #f0f8ff;
+        border-color: #FF6B6B !important;
+    }
+    
+    /* 移除所有元素的红框和左侧括号 */
+    div.element-container {
+        border: none !important;
+    }
+    
+    div.element-container::before {
+        content: none !important;
+    }
+    
+    /* 移除图片容器的边框和括号 */
+    div.stImage {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    div.stImage::before {
+        content: none !important;
+    }
+    
+    /* 移除所有可能的括号和边框 */
+    div[data-testid="stVerticalBlock"] > div::before {
+        content: none !important;
+    }
+    
+    div[data-testid="stVerticalBlock"] > div {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* 移除结果区域的边框 */
+    .result-box {
+        border: none !important;
+        border-left: 5px solid #FF6B6B !important;
+    }
+    
+    /* 移除文本区域的边框和括号 */
+    .stTextArea > div {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .stTextArea > div::before {
+        content: none !important;
+    }
+    
+    /* 移除所有可能的文本输入区域的边框和括号 */
+    [data-testid="stText"], 
+    [data-testid="stMarkdown"],
+    textarea,
+    .stTextInput > div,
+    .stTextInput > div > div {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    [data-testid="stText"]::before, 
+    [data-testid="stMarkdown"]::before,
+    textarea::before,
+    .stTextInput > div::before,
+    .stTextInput > div > div::before {
+        content: none !important;
+    }
+    
+    /* 确保所有文本区域没有边框和括号 */
+    div[data-baseweb="textarea"] {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    div[data-baseweb="textarea"]::before {
+        content: none !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
     # 页面标题和介绍
-    st.markdown('<div class="main-header">🐾 AI宠物描述生成器</div>', unsafe_allow_html=True)
-    st.markdown('<div class="description">上传一张宠物的图片，AI将为您生成暖心的描述和可爱的动漫风格图片！</div>', unsafe_allow_html=True)
-    
-    # 单列垂直布局，适合移动端 - 直接连接标题和上传区域
-    st.markdown('<div class="sub-header">📸 上传宠物照片</div><div class="info-box">', unsafe_allow_html=True)
-    
-    # 文件上传器
-    uploaded_file = st.file_uploader("选择一张宠物图片", type=["jpg", "jpeg", "png"], key="pet_image_uploader")
-    if not uploaded_file:
-        st.markdown("👆 请点击上方区域上传宠物图片")
-        st.markdown("支持JPG、JPEG和PNG格式")
+    st.markdown('<div class="main-header">🐾 萌宠动漫形象生成器</div>', unsafe_allow_html=True)
+    st.markdown('<div class="description">上传一张宠物照片，立即获得可爱的动漫风格形象和暖心描述！</div>', unsafe_allow_html=True)
     
     # 显示用户配额信息
     has_quota, remaining = check_user_quota()
     st.markdown(f'<div class="quota-info">今日剩余生成次数：{remaining}次（每天10次）</div>', unsafe_allow_html=True)
     
-    # 关闭info-box
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 单列垂直布局，适合移动端 - 直接连接标题和上传区域
+    st.markdown('<div class="sub-header">📸 上传宠物照片</div>', unsafe_allow_html=True)
+    
+    # 文件上传器 - 不再使用info-box包装
+    uploaded_file = st.file_uploader("选择一张宠物图片", type=["jpg", "jpeg", "png"], key="pet_image_uploader")
+    if not uploaded_file:
+        st.markdown("👆 请点击上方区域上传宠物图片")
+        st.markdown("支持JPG、JPEG和PNG格式")
     
     # 显示上传的图片
     if uploaded_file is not None:
@@ -382,13 +507,11 @@ def main():
                 
                 # 生成动漫图片
                 with st.spinner("🎨 正在创作动漫风格图片..."):
-                    # 合并标题和框为一个HTML标记
-                    st.markdown('<div class="sub-header">🎨 动漫风格图片</div><div class="result-box">', unsafe_allow_html=True)
+                    # 显示标题，但不使用result-box包装
+                    st.markdown('<div class="sub-header">🎨 动漫风格图片</div>', unsafe_allow_html=True)
                     success = generate_anime_pet(description)
                     if not success:
                         st.error("未能生成动漫风格图片，请稍后再试")
-                    # 关闭result-box
-                    st.markdown('</div>', unsafe_allow_html=True)
                 
                 # 重置按钮
                 if st.button("🔄 重新开始", key="reset_button"):
@@ -522,6 +645,57 @@ def increment_user_usage():
     if has_quota:
         # 增加用户使用次数
         st.session_state.user_quotas[today][user_id] += 1
+
+def analyze_pet_image(image_bytes):
+    """使用千问VL模型分析宠物图片"""
+    try:
+        import os
+        import base64
+        from openai import OpenAI
+        
+        # 将图片转换为base64编码
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # 初始化OpenAI客户端（使用百炼兼容模式）
+        client = OpenAI(
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        
+        # 构建提示词
+        prompt = """请详细分析这张宠物照片，包括：
+        1. 宠物的品种、颜色、体型特征
+        2. 宠物的姿势、表情和可能的情绪状态
+        3. 宠物的特殊标记或独特特征
+        4. 宠物的毛发特点、长度和质地
+        
+        请用温暖亲切的语言，以"这是一只..."开头，描述这只宠物，就像在向一个爱宠人士介绍这只可爱的动物。
+        描述要详细生动，突出这只宠物的独特之处，长度在150-200字之间。
+        不要提及照片质量、背景环境或人类。只关注宠物本身。"""
+        
+        # 发送请求
+        completion = client.chat.completions.create(
+            model="qwen-vl-plus",  # 使用千问VL模型
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                ]
+            }]
+        )
+        
+        # 提取回复内容
+        description = completion.choices[0].message.content
+        
+        # 保存描述到会话状态
+        st.session_state.description = description
+        
+        return description
+    
+    except Exception as e:
+        st.error(f"分析图片时出错: {str(e)}")
+        return None
 
 if __name__ == "__main__":
     # 初始化session_state
