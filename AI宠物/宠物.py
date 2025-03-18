@@ -89,7 +89,7 @@ def generate_pet_description(image_file):
         st.error(traceback.format_exc())
         return "无法生成描述，请尝试上传更小的图片或稍后再试。"
 
-def generate_anime_pet(description):
+def generate_anime_pet(description, style="宫崎骏"):
     """使用阿里云百炼API生成动漫风格宠物图片"""
     try:
         # 检查用户配额
@@ -114,21 +114,78 @@ def generate_anime_pet(description):
         color_match = re.search(r'(黑|白|灰|棕|黄|橙|红|蓝|绿|米|奶油|金|银|褐|咖啡|巧克力|双色|三色|多色)(色|毛)', description)
         color = color_match.group(1) if color_match else ""
         
-        # 构建宫崎骏风格的提示词
-        prompt = f"""生成一张高质量的宫崎骏风格宠物图片，必须严格遵循以下要求：
+        # 根据选择的风格构建提示词
+        style_prompts = {
+            "宫崎骏": f"""生成一张高质量的宫崎骏风格宠物图片，必须严格遵循以下要求：
+            
+            1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
+            2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
+            3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
+            4. 宫崎骏风格：温暖柔和的色调，圆润的线条，富有表现力的大眼睛，细腻的毛发纹理
+            5. 艺术特点：类似《龙猫》《千与千寻》《哈尔的移动城堡》的温馨画风，手绘质感
+            6. 光影效果：柔和的自然光线，温暖的色彩过渡，轻微的水彩晕染效果
+            7. 背景：简洁温馨的自然环境，如草地、森林或温暖的室内场景，带有宫崎骏电影中常见的自然元素
+            8. 表情：保持宠物原有表情的同时，增添一丝灵动和温暖感
+            """,
+            
+            "迪士尼": f"""生成一张高质量的迪士尼动画风格宠物图片，必须严格遵循以下要求：
+            
+            1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
+            2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
+            3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
+            4. 迪士尼风格：明亮饱和的色彩，圆润流畅的线条，夸张的表情，大而有神的眼睛
+            5. 艺术特点：类似《疯狂动物城》《狮子王》的现代迪士尼风格，精细的毛发渲染，生动的表情
+            6. 光影效果：明亮的光线，清晰的阴影，强调立体感的渲染
+            7. 背景：简洁明亮的背景，可能包含迪士尼风格的装饰元素
+            8. 表情：保持宠物原有表情的基础上，增添迪士尼角色般的生动表现力
+            """,
+            
+            "皮克斯": f"""生成一张高质量的皮克斯3D动画风格宠物图片，必须严格遵循以下要求：
+            
+            1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
+            2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
+            3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
+            4. 皮克斯风格：3D渲染效果，细腻的质感，逼真但略带卡通感的形象
+            5. 艺术特点：类似《玩具总动员》《寻梦环游记》《心灵奇旅》的精细3D建模风格
+            6. 光影效果：精细的光影处理，柔和的环境光，细腻的材质反射
+            7. 背景：简洁但有深度的背景，可能包含皮克斯风格的环境元素
+            8. 表情：保持宠物原有表情的基础上，增添皮克斯角色般的情感表现力
+            """,
+            
+            "水彩画": f"""生成一张高质量的水彩画风格宠物图片，必须严格遵循以下要求：
+            
+            1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
+            2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
+            3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
+            4. 水彩画风格：柔和的色彩融合，轻微的水彩晕染效果，透明感的层次
+            5. 艺术特点：手绘质感，自然的色彩过渡，轻柔的笔触，略带模糊的边缘
+            6. 光影效果：柔和的光线表现，淡雅的色调，轻微的水彩纸肌理
+            7. 背景：简约的水彩背景，可能有轻微的水渍效果或留白
+            8. 表情：保持宠物原有表情，通过水彩的柔和特性表现宠物的温柔气质
+            """,
+            
+            "像素艺术": f"""生成一张高质量的像素艺术风格宠物图片，必须严格遵循以下要求：
+            
+            1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
+            2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
+            3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
+            4. 像素艺术风格：清晰可见的像素方块，有限的色彩调色板，复古游戏风格
+            5. 艺术特点：类似16位或32位游戏时代的像素艺术，方块化的形象，简化但辨识度高的细节
+            6. 光影效果：简化的阴影表现，有限的色阶过渡，点阵化的高光
+            7. 背景：简单的像素艺术背景，可能包含复古游戏元素
+            8. 表情：通过最少的像素点表达宠物的表情和性格
+            """
+        }
         
-        1. 宠物品种：必须是{breed if breed else "与原图完全相同的品种"}，不得更改或混合其他品种特征
-        2. 毛色和花纹：必须是{color if color else "与原图完全相同的颜色"}，包括所有花纹、斑点和颜色分布
-        3. 姿势和姿态：必须与原图中的宠物保持完全相同的姿势、动作和身体朝向
-        4. 宫崎骏风格：温暖柔和的色调，圆润的线条，富有表现力的大眼睛，细腻的毛发纹理
-        5. 艺术特点：类似《龙猫》《千与千寻》《哈尔的移动城堡》的温馨画风，手绘质感
-        6. 光影效果：柔和的自然光线，温暖的色彩过渡，轻微的水彩晕染效果
-        7. 背景：简洁温馨的自然环境，如草地、森林或温暖的室内场景，带有宫崎骏电影中常见的自然元素
-        8. 表情：保持宠物原有表情的同时，增添一丝灵动和温暖感
+        # 获取选定风格的提示词
+        prompt = style_prompts.get(style, style_prompts["宫崎骏"])
+        
+        # 添加通用结尾
+        prompt += f"""
         
         原图宠物完整描述：{pet_features_text}
         
-        重要提示：这是一个宫崎骏风格改造任务，但必须保持宠物的品种、颜色和关键特征完全一致，让原宠物主人能一眼认出自己的宠物。
+        重要提示：这是一个{style}风格改造任务，但必须保持宠物的品种、颜色和关键特征完全一致，让原宠物主人能一眼认出自己的宠物。
         """
         
         # 构建请求体
@@ -189,7 +246,7 @@ def generate_anime_pet(description):
                                         # 将图片数据转换为PIL图像
                                         image = Image.open(io.BytesIO(img_response.content))
                                         # 在Streamlit中显示图片，使用use_container_width替代use_column_width
-                                        st.image(image, caption="AI生成的动漫风格宠物", use_container_width=True)
+                                        st.image(image, caption=f"AI生成的{style}风格宠物", use_container_width=True)
                                         # 增加用户使用次数
                                         increment_user_usage()
                                         # 更新显示的剩余次数
@@ -219,7 +276,7 @@ def generate_anime_pet(description):
                         # 将图片数据转换为PIL图像
                         image = Image.open(io.BytesIO(img_response.content))
                         # 在Streamlit中显示图片，使用use_container_width替代use_column_width
-                        st.image(image, caption="AI生成的动漫风格宠物", use_container_width=True)
+                        st.image(image, caption=f"AI生成的{style}风格宠物", use_container_width=True)
                         # 增加用户使用次数
                         increment_user_usage()
                         # 更新显示的剩余次数
@@ -456,6 +513,48 @@ def main():
     div[data-baseweb="textarea"]::before {
         content: none !important;
     }
+    
+    /* 风格选择器样式 */
+    .style-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 1rem;
+    }
+    
+    .style-option {
+        flex: 1;
+        min-width: 100px;
+        text-align: center;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .style-option:hover {
+        border-color: #4ECDC4;
+        background-color: #f0f8ff;
+    }
+    
+    .style-option.selected {
+        border-color: #FF6B6B;
+        background-color: #fff0f0;
+    }
+    
+    .style-option img {
+        width: 100%;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .style-option p {
+        margin: 0;
+        font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -482,6 +581,27 @@ def main():
             image = Image.open(uploaded_file)
             st.image(image, caption="上传的宠物图片", use_container_width=True)
             
+            # 添加风格选择
+            st.markdown('<div class="sub-header">🎨 选择动漫风格</div>', unsafe_allow_html=True)
+            
+            # 定义可用的风格选项
+            styles = ["宫崎骏", "迪士尼", "皮克斯", "水彩画", "像素艺术"]
+            
+            # 使用session_state存储选择的风格
+            if 'selected_style' not in st.session_state:
+                st.session_state.selected_style = styles[0]  # 默认选择宫崎骏风格
+            
+            # 创建风格选择器
+            cols = st.columns(len(styles))
+            for i, style in enumerate(styles):
+                with cols[i]:
+                    # 使用按钮来选择风格
+                    if st.button(style, key=f"style_{style}"):
+                        st.session_state.selected_style = style
+            
+            # 显示当前选择的风格
+            st.markdown(f"<p style='text-align:center; margin-top:10px;'>当前选择: <b>{st.session_state.selected_style}</b></p>", unsafe_allow_html=True)
+            
             # 生成描述按钮
             if st.button("✨ 生成宠物描述和动漫图片", key="generate_button"):
                 # 保存按钮状态
@@ -505,12 +625,12 @@ def main():
                     st.markdown('</div>', unsafe_allow_html=True)
                 
                 # 生成动漫图片
-                with st.spinner("🎨 正在创作动漫风格图片..."):
+                with st.spinner(f"🎨 正在创作{st.session_state.selected_style}风格图片..."):
                     # 显示标题，但不使用result-box包装
-                    st.markdown('<div class="sub-header">🎨 动漫风格图片</div>', unsafe_allow_html=True)
-                    success = generate_anime_pet(description)
+                    st.markdown(f'<div class="sub-header">🎨 {st.session_state.selected_style}风格图片</div>', unsafe_allow_html=True)
+                    success = generate_anime_pet(description, st.session_state.selected_style)
                     if not success:
-                        st.error("未能生成动漫风格图片，请稍后再试")
+                        st.error(f"未能生成{st.session_state.selected_style}风格图片，请稍后再试")
                 
                 # 重置按钮
                 if st.button("🔄 重新开始", key="reset_button"):
