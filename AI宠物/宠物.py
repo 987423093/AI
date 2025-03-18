@@ -101,9 +101,8 @@ def generate_anime_pet(description):
         # 构建请求URL
         url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis"
         
-        # 提取宠物品种和特征的关键信息
-        pet_features = description.split("。")[0:3]  # 取描述的前几句话作为关键特征
-        pet_features_text = "。".join(pet_features)
+        # 使用完整描述作为关键特征
+        pet_features_text = description  # 使用全部描述，而不是只取前几句
         
         # 尝试从描述中提取品种和颜色信息
         
@@ -127,7 +126,7 @@ def generate_anime_pet(description):
         7. 背景：简洁温馨的自然环境，如草地、森林或温暖的室内场景，带有宫崎骏电影中常见的自然元素
         8. 表情：保持宠物原有表情的同时，增添一丝灵动和温暖感
         
-        原图宠物描述：{pet_features_text}
+        原图宠物完整描述：{pet_features_text}
         
         重要提示：这是一个宫崎骏风格改造任务，但必须保持宠物的品种、颜色和关键特征完全一致，让原宠物主人能一眼认出自己的宠物。
         """
