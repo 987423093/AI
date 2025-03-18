@@ -120,7 +120,7 @@ def generate_anime_pet(description):
         
         # 构建请求体
         payload = {
-            "model": "wanx2.1-t2i-turbo",
+            "model": "wanx2.1-t2i-plus",
             "input": {
                 "prompt": prompt
             },
