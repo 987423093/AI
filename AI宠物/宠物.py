@@ -7,6 +7,8 @@ import requests
 import json
 from openai import OpenAI
 import time
+import datetime
+import uuid
 
 # 阿里云百炼API配置
 DASHSCOPE_API_KEY = "sk-b8190cc0897b49b494c4dc8d6228c3bf"  # 请替换为您的阿里云DashScope API Key
@@ -89,6 +91,12 @@ def generate_pet_description(image_file):
 def generate_anime_pet(description):
     """使用阿里云百炼API生成动漫风格宠物图片"""
     try:
+        # 检查用户配额
+        has_quota, remaining = check_user_quota()
+        if not has_quota:
+            st.error("您今日的图片生成次数已达上限（10次/天）。请明天再来尝试！")
+            return False
+        
         # 构建请求URL
         url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis"
         
@@ -96,16 +104,18 @@ def generate_anime_pet(description):
         pet_features = description.split("。")[0:3]  # 取描述的前几句话作为关键特征
         pet_features_text = "。".join(pet_features)
         
-        # 构建更详细的提示词，强调保持原图姿势
+        # 构建更详细的提示词，强调保持原图特征
         prompt = f"""生成一张可爱的动漫风格宠物图片，基于以下描述：{pet_features_text}
         要求：
-        1. 必须保持与原图宠物完全相同的姿势和动作
-        2. 保持与原图宠物相同的品种、毛色和主要特征
-        3. 画风可爱、精致，像宫崎骏或迪士尼动画风格
-        4. 明亮温暖的色调，细腻的毛发纹理
-        5. 大眼睛，表情生动可爱
-        6. 简洁干净的背景，突出宠物形象
-        7. 尽可能精确地复制原图中宠物的姿态、角度和身体朝向
+        1. 必须完全保持与原图宠物相同的姿势、姿态和动作，包括身体朝向、头部角度和四肢位置
+        2. 必须精确匹配原图宠物的确切品种和种类
+        3. 必须精确匹配原图宠物的毛色、花纹和颜色分布
+        4. 必须保持与原图宠物相同的体型比例和特征
+        5. 画风可爱、精致，像宫崎骏或迪士尼动画风格
+        6. 明亮温暖的色调，细腻的毛发纹理
+        7. 大眼睛，表情生动可爱，但表情应与原图相符
+        8. 简洁干净的背景，突出宠物形象
+        9. 如果原图中有多个宠物，请保持它们之间的相对位置和互动关系
         """
         
         # 构建请求体
@@ -117,7 +127,7 @@ def generate_anime_pet(description):
             "parameters": {
                 "size": "1024*1024",  # 图片尺寸
                 "n": 1,  # 生成图片数量
-                "negative_prompt": "变形, 错误姿势, 不同姿势, 不同角度, 不同朝向"  # 负面提示词，避免姿势变化
+                "negative_prompt": "变形, 错误姿势, 不同姿势, 不同角度, 不同朝向, 错误品种, 错误颜色, 错误花纹, 错误体型, 多余的宠物, 缺少的宠物"  # 负面提示词，避免特征变化
             }
         }
         
@@ -167,6 +177,11 @@ def generate_anime_pet(description):
                                         image = Image.open(io.BytesIO(img_response.content))
                                         # 在Streamlit中显示图片，使用use_container_width替代use_column_width
                                         st.image(image, caption="AI生成的动漫风格宠物", use_container_width=True)
+                                        # 增加用户使用次数
+                                        increment_user_usage()
+                                        # 更新显示的剩余次数
+                                        _, remaining = check_user_quota()
+                                        st.markdown(f'<div class="quota-info">今日剩余生成次数：{remaining}次（每天10次）</div>', unsafe_allow_html=True)
                                         return True
                             break
                         elif status == "FAILED":
@@ -192,6 +207,11 @@ def generate_anime_pet(description):
                         image = Image.open(io.BytesIO(img_response.content))
                         # 在Streamlit中显示图片，使用use_container_width替代use_column_width
                         st.image(image, caption="AI生成的动漫风格宠物", use_container_width=True)
+                        # 增加用户使用次数
+                        increment_user_usage()
+                        # 更新显示的剩余次数
+                        _, remaining = check_user_quota()
+                        st.markdown(f'<div class="quota-info">今日剩余生成次数：{remaining}次（每天10次）</div>', unsafe_allow_html=True)
                         return True
                     else:
                         st.error(f"下载生成的图片失败: {img_response.status_code}")
@@ -325,6 +345,10 @@ def main():
         st.markdown("👆 请点击上方区域上传宠物图片")
         st.markdown("支持JPG、JPEG和PNG格式")
     
+    # 显示用户配额信息
+    has_quota, remaining = check_user_quota()
+    st.markdown(f'<div class="quota-info">今日剩余生成次数：{remaining}次（每天10次）</div>', unsafe_allow_html=True)
+    
     # 关闭info-box
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -453,6 +477,51 @@ def generate_pet_description_stream(image_file, placeholder):
         import traceback
         st.error(traceback.format_exc())
         return "无法生成描述，请尝试上传更小的图片或稍后再试。"
+
+def check_user_quota():
+    """检查用户是否还有剩余配额"""
+    user_id = get_user_id()
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    # 初始化用户配额跟踪
+    if 'user_quotas' not in st.session_state:
+        st.session_state.user_quotas = {}
+    
+    # 初始化今天的用户配额
+    if today not in st.session_state.user_quotas:
+        st.session_state.user_quotas[today] = {}
+    
+    # 初始化特定用户的配额
+    if user_id not in st.session_state.user_quotas[today]:
+        st.session_state.user_quotas[today][user_id] = 0
+    
+    # 检查是否超过限制 (10次/天)
+    if st.session_state.user_quotas[today][user_id] >= 10:
+        return False, 10 - st.session_state.user_quotas[today][user_id]
+    
+    return True, 10 - st.session_state.user_quotas[today][user_id]
+
+def get_user_id():
+    """获取用户唯一标识，使用会话ID作为简单实现"""
+    # 使用会话状态存储用户ID，避免使用可能被浏览器阻止的外部API
+    if 'user_id' not in st.session_state:
+        # 生成一个基于时间的随机ID
+        today = datetime.datetime.now().strftime("%Y%m%d")
+        random_id = str(uuid.uuid4())[:8]
+        st.session_state.user_id = f"{today}-{random_id}"
+    
+    return st.session_state.user_id
+
+def increment_user_usage():
+    """增加用户使用次数"""
+    user_id = get_user_id()
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    # 检查用户配额
+    has_quota, remaining = check_user_quota()
+    if has_quota:
+        # 增加用户使用次数
+        st.session_state.user_quotas[today][user_id] += 1
 
 if __name__ == "__main__":
     # 初始化session_state
